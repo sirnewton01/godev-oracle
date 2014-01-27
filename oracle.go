@@ -5,6 +5,7 @@
 package main
 
 import (
+	_ "code.google.com/p/go.tools/cmd/oracle"
 	"encoding/json"
 	"flag"
 	"fmt"
