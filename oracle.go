@@ -16,7 +16,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 )
 
@@ -173,53 +172,17 @@ func main() {
 		return
 	}
 
-	req, err := cgi.Request()
+	err := cgi.Serve(http.HandlerFunc(oracleHandler))
 
 	if err != nil {
 		fmt.Printf("Error trying to set up the CGI request", err.Error())
 		return
 	}
-
-	writer := &cgiWriter{file: os.Stdout, wroteHeader: false, header: make(http.Header)}
-
-	if !oracleHandler(writer, req, req.URL.Path, strings.Split(req.URL.Path, "/")[2:]) {
-		ShowError(writer, 400, "Request not handled", nil)
-	}
 }
 
-type cgiWriter struct {
-	file        *os.File
-	header      http.Header
-	wroteHeader bool
-}
+func oracleHandler(writer http.ResponseWriter, req *http.Request) {
+	pathSegs := strings.Split(req.URL.Path, "/")[2:]
 
-func (writer *cgiWriter) WriteHeader(status int) {
-	if !writer.wroteHeader {
-		statusStr := strconv.FormatInt(int64(status), 10)
-		writer.file.Write([]byte("Status: " + statusStr + "\r\n"))
-		writer.header.Write(writer.file)
-
-		// Final blank line separates the headers from the content
-		writer.file.Write([]byte("\r\n"))
-	} else {
-		fmt.Errorf("Multiple write header calls")
-	}
-	writer.wroteHeader = true
-}
-
-func (writer *cgiWriter) Header() http.Header {
-	return writer.header
-}
-
-func (writer *cgiWriter) Write(bytes []byte) (n int, err error) {
-	if !writer.wroteHeader {
-		writer.WriteHeader(http.StatusOK)
-	}
-
-	return writer.file.Write(bytes)
-}
-
-func oracleHandler(writer http.ResponseWriter, req *http.Request, path string, pathSegs []string) bool {
 	switch {
 	case req.Method == "GET" && pathSegs[2] == "implements":
 		localFilePath := ""
@@ -249,12 +212,12 @@ func oracleHandler(writer http.ResponseWriter, req *http.Request, path string, p
 			if strings.Contains(strings.ToLower(err.Error()), "not found") {
 				// Executable was not found, inform the user
 				ShowError(writer, 500, "Oracle tool failed or is not installed.", err)
-				return true
+				return
 			}
 
 			// Tool returns no results basically
 			writer.WriteHeader(204)
-			return true
+			return
 		}
 
 		implements := &ImplementsResult{}
@@ -271,7 +234,7 @@ func oracleHandler(writer http.ResponseWriter, req *http.Request, path string, p
 		}
 
 		ShowJson(writer, 200, implements)
-		return true
+		return
 	case req.Method == "GET" && pathSegs[2] == "referrers":
 		localFilePath := ""
 		pathToMatch := "/" + strings.Join(pathSegs[4:], "/")
@@ -297,7 +260,7 @@ func oracleHandler(writer http.ResponseWriter, req *http.Request, path string, p
 		output, err := cmd.StdoutPipe()
 		if err != nil {
 			ShowError(writer, 500, "Error opening pipe", err)
-			return true
+			return
 		}
 		defer output.Close()
 		err = cmd.Start()
@@ -306,12 +269,12 @@ func oracleHandler(writer http.ResponseWriter, req *http.Request, path string, p
 			if strings.Contains(strings.ToLower(err.Error()), "not found") {
 				// Executable was not found, inform the user
 				ShowError(writer, 500, "Oracle tool failed or is not installed.", err)
-				return true
+				return
 			}
 
 			// Tool returns no results basically
 			writer.WriteHeader(204)
-			return true
+			return
 		}
 
 		decoder := json.NewDecoder(output)
@@ -326,7 +289,7 @@ func oracleHandler(writer http.ResponseWriter, req *http.Request, path string, p
 		}
 
 		ShowJson(writer, 200, referrers)
-		return true
+		return
 	case req.Method == "GET" && pathSegs[2] == "callers":
 		localFilePath := ""
 		pathToMatch := "/" + strings.Join(pathSegs[4:], "/")
@@ -352,7 +315,7 @@ func oracleHandler(writer http.ResponseWriter, req *http.Request, path string, p
 		output, err := cmd.StdoutPipe()
 		if err != nil {
 			ShowError(writer, 500, "Error opening pipe", err)
-			return true
+			return
 		}
 		defer output.Close()
 		err = cmd.Start()
@@ -361,12 +324,12 @@ func oracleHandler(writer http.ResponseWriter, req *http.Request, path string, p
 			if strings.Contains(strings.ToLower(err.Error()), "not found") {
 				// Executable was not found, inform the user
 				ShowError(writer, 500, "Oracle tool failed or is not installed.", err)
-				return true
+				return
 			}
 
 			// Tool returns no results basically
 			writer.WriteHeader(204)
-			return true
+			return
 		}
 
 		decoder := json.NewDecoder(output)
@@ -380,7 +343,7 @@ func oracleHandler(writer http.ResponseWriter, req *http.Request, path string, p
 		}
 
 		ShowJson(writer, 200, callers)
-		return true
+		return
 	case req.Method == "GET" && pathSegs[2] == "peers":
 		localFilePath := ""
 		pathToMatch := "/" + strings.Join(pathSegs[4:], "/")
@@ -406,7 +369,7 @@ func oracleHandler(writer http.ResponseWriter, req *http.Request, path string, p
 		output, err := cmd.StdoutPipe()
 		if err != nil {
 			ShowError(writer, 500, "Error opening pipe", err)
-			return true
+			return
 		}
 		defer output.Close()
 		err = cmd.Start()
@@ -415,12 +378,12 @@ func oracleHandler(writer http.ResponseWriter, req *http.Request, path string, p
 			if strings.Contains(strings.ToLower(err.Error()), "not found") {
 				// Executable was not found, inform the user
 				ShowError(writer, 500, "Oracle tool failed or is not installed.", err)
-				return true
+				return
 			}
 
 			// Tool returns no results basically
 			writer.WriteHeader(204)
-			return true
+			return
 		}
 
 		decoder := json.NewDecoder(output)
@@ -445,8 +408,8 @@ func oracleHandler(writer http.ResponseWriter, req *http.Request, path string, p
 		}
 
 		ShowJson(writer, 200, peers)
-		return true
+		return
 	}
 
-	return false
+	ShowError(writer, 400, "Request not handled", nil)
 }
